@@ -123,7 +123,7 @@ When `--log-api` is enabled:
 ├── api-logger/                 # API traffic logging proxy
 │   ├── Dockerfile
 │   └── server.py
-├── claude-upload-server/       # File upload server
+├── upload-server/       # File upload server
 │   └── server.py
 └── docs/
     └── REFACTORING-PLAN.md

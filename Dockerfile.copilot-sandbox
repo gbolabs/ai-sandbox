@@ -45,7 +45,7 @@ COPY entrypoint.copilot.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copy upload server
-COPY claude-upload-server/server.py /opt/upload-server.py
+COPY upload-server/server.py /opt/upload-server.py
 RUN chmod +x /opt/upload-server.py
 
 # Switch to non-root user
