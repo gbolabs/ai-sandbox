@@ -28,20 +28,13 @@ fi
 echo ""
 
 # =============================================================================
-# Merge host .claude settings if mounted
+# Claude Auth Context
 # =============================================================================
-if [[ -d "/home/claude/.claude-host" ]]; then
-    echo "Merging host Claude settings..."
-    mkdir -p /home/claude/.claude
-    for file in /home/claude/.claude-host/*; do
-        if [[ -f "$file" ]]; then
-            local_file="/home/claude/.claude/$(basename "$file")"
-            if [[ ! -f "$local_file" ]]; then
-                cp "$file" "$local_file"
-                echo "  Copied: $(basename "$file")"
-            fi
-        fi
-    done
+if [[ -d "/home/claude/.claude" ]]; then
+    echo "Claude Code: auth context mounted from host"
+else
+    echo "Claude Code: no auth context found"
+    echo "  Run 'claude' on host first to authenticate"
 fi
 
 # =============================================================================

@@ -67,10 +67,13 @@ Container Options:
   --skip-scope-check   Skip GitHub token scope validation
   -h, --help           Show this help message
 
+Authentication:
+  Claude Code and Vibe CLI use OAuth authentication (not API keys).
+  Run the CLI on your host first to authenticate, then the container
+  will reuse your auth context from ~/.claude or ~/.vibe.
+
 Environment Variables:
-  ANTHROPIC_API_KEY    For Claude Code
-  MISTRAL_API_KEY      For Vibe CLI
-  GH_TOKEN             GitHub token for private repos
+  GH_TOKEN             GitHub token for private repos and Copilot
   AZURE_DEVOPS_PAT     Azure DevOps personal access token
 
 Examples:
@@ -158,8 +161,6 @@ set_cli_config() {
             CONTAINER_PREFIX="claude-sandbox"
             VOLUME_PREFIX="claude"
             USER_NAME="claude"
-            ENTRYPOINT_CLI="claude --dangerously-skip-permissions"
-            API_KEY_VAR="ANTHROPIC_API_KEY"
             ;;
         vibe)
             IMAGE_NAME="ai-sandbox-vibe:latest"
@@ -167,8 +168,6 @@ set_cli_config() {
             CONTAINER_PREFIX="vibe-sandbox"
             VOLUME_PREFIX="vibe"
             USER_NAME="vibe"
-            ENTRYPOINT_CLI="vibe"
-            API_KEY_VAR="MISTRAL_API_KEY"
             ;;
         copilot)
             IMAGE_NAME="ai-sandbox-copilot:latest"
@@ -176,8 +175,6 @@ set_cli_config() {
             CONTAINER_PREFIX="copilot-sandbox"
             VOLUME_PREFIX="copilot"
             USER_NAME="copilot"
-            ENTRYPOINT_CLI="bash"
-            API_KEY_VAR="GH_TOKEN"
             ;;
         *)
             error "Unknown CLI type: $CLI_TYPE (use: claude, vibe, copilot)"
@@ -324,18 +321,20 @@ get_project_ports() {
 get_host_context_mounts() {
     local mounts=""
 
+    # CLI-specific auth context (OAuth tokens, not API keys)
     case "$CLI_TYPE" in
         claude)
-            if [[ -d "$HOME/.anthropic" ]]; then
-                mounts+="-v $HOME/.anthropic:/home/claude/.anthropic:Z "
-            fi
+            # Claude Code stores OAuth tokens in ~/.claude
             if [[ -d "$HOME/.claude" ]]; then
-                mounts+="-v $HOME/.claude:/home/claude/.claude-host:ro "
+                mounts+="-v $HOME/.claude:/home/claude/.claude:ro "
+                log "Mounting Claude auth context from ~/.claude"
             fi
             ;;
         vibe)
+            # Vibe CLI stores OAuth tokens in ~/.vibe
             if [[ -d "$HOME/.vibe" ]]; then
-                mounts+="-v $HOME/.vibe:/home/vibe/.vibe:Z "
+                mounts+="-v $HOME/.vibe:/home/vibe/.vibe:ro "
+                log "Mounting Vibe auth context from ~/.vibe"
             fi
             ;;
         copilot)
@@ -343,7 +342,7 @@ get_host_context_mounts() {
             ;;
     esac
 
-    # Common mounts
+    # Common mounts (read-only)
     if [[ -d "$HOME/.config/gh" ]]; then
         mounts+="-v $HOME/.config/gh:/home/${USER_NAME}/.config/gh:ro "
     fi
@@ -520,16 +519,18 @@ check_prereqs() {
 
     command -v podman >/dev/null 2>&1 || error "Podman is not installed"
 
-    # Check API key for selected CLI
+    # Check auth context for selected CLI (OAuth-based, not API keys)
     case "$CLI_TYPE" in
         claude)
-            if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-                warn "ANTHROPIC_API_KEY not set"
+            if [[ ! -d "$HOME/.claude" ]]; then
+                warn "No Claude auth context found (~/.claude)"
+                warn "Run 'claude' on host first to authenticate"
             fi
             ;;
         vibe)
-            if [[ -z "${MISTRAL_API_KEY:-}" ]]; then
-                warn "MISTRAL_API_KEY not set"
+            if [[ ! -d "$HOME/.vibe" ]]; then
+                warn "No Vibe auth context found (~/.vibe)"
+                warn "Run 'vibe' on host first to authenticate"
             fi
             ;;
         copilot)
@@ -603,7 +604,6 @@ run_mount_mode() {
         -e GIT_COMMITTER_EMAIL="$git_email" \
         -e DOCKER_HOST="unix:///var/run/docker.sock" \
         -e PROJECT_NAME="$PROJECT_NAME" \
-        -e ${API_KEY_VAR}="${!API_KEY_VAR:-}" \
         -p ${CODE_SERVER_PORT}:8443 \
         -p ${UPLOAD_PORT}:8888 \
         -v "$(pwd):/workspace:Z" \
@@ -665,7 +665,6 @@ run_clone_mode() {
         -e BRANCH="$BRANCH" \
         -e DOCKER_HOST="unix:///var/run/docker.sock" \
         -e PROJECT_NAME="$PROJECT_NAME" \
-        -e ${API_KEY_VAR}="${!API_KEY_VAR:-}" \
         -p ${CODE_SERVER_PORT}:8443 \
         -p ${UPLOAD_PORT}:8888 \
         -v "$WORKSPACE_VOLUME:/workspace:Z" \

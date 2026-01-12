@@ -75,12 +75,11 @@ Features:
 
 ### Host Context Mounts
 
-Authentication is reused from your host machine:
-- `~/.anthropic` → Read-write (Claude API credentials)
-- `~/.claude` → Read-only (Claude settings)
-- `~/.vibe` → Read-write (Vibe settings, when using --cli=vibe)
-- `~/.config/gh` → Read-only (GitHub CLI auth)
-- `~/.azure` → Read-only (Azure CLI auth)
+Authentication is reused from your host machine (read-only):
+- `~/.claude` → Claude Code OAuth tokens
+- `~/.vibe` → Vibe CLI OAuth tokens
+- `~/.config/gh` → GitHub CLI auth (for Copilot and git operations)
+- `~/.azure` → Azure CLI auth (for Azure DevOps)
 
 ### OpenTelemetry Tracing
 
@@ -101,13 +100,23 @@ When `--log-api` is enabled:
 - Drag & drop files or paste images from clipboard
 - Files saved to `~/share` in container
 
+## Authentication
+
+Claude Code and Vibe CLI use **OAuth authentication** (not API keys). The container reuses your host's auth context:
+
+| CLI | Auth Directory | How to Authenticate |
+|-----|----------------|---------------------|
+| Claude Code | `~/.claude` | Run `claude` on host first |
+| Vibe CLI | `~/.vibe` | Run `vibe` on host first |
+| GitHub Copilot | `~/.config/gh` | Run `gh auth login` on host |
+
+The auth directories are mounted read-only into the container.
+
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | For Claude Code |
-| `MISTRAL_API_KEY` | For Vibe CLI |
-| `GH_TOKEN` | GitHub token for private repos |
+| `GH_TOKEN` | GitHub token for private repos and Copilot |
 | `AZURE_DEVOPS_PAT` | Azure DevOps personal access token |
 
 ## File Structure
