@@ -53,6 +53,7 @@ Modes:
   recover      Restart and attach to stopped container
   clean        Remove containers/volumes/images
   build        Rebuild the Docker image
+  docs [path]  Start documentation server for /docs (or custom path)
 
 CLI Selection:
   --cli=NAME           AI CLI to use: claude, vibe, copilot [default: claude]
@@ -110,6 +111,11 @@ Examples:
 
   # Clean up
   ./sandbox.sh clean --all
+
+  # Start documentation server
+  ./sandbox.sh docs
+  ./sandbox.sh docs my-docs    # Custom path
+  DOCS_PORT=4000 ./sandbox.sh docs
 
 Clean mode options:
   --containers         Remove project containers
@@ -752,6 +758,60 @@ run_clean_mode() {
 }
 
 # =============================================================================
+# Documentation Server Mode
+# =============================================================================
+
+run_docs_mode() {
+    local docs_path="${1:-docs}"
+    local docs_port="${DOCS_PORT:-3000}"
+    local docify_image="ai-sandbox-docify:latest"
+
+    # Create docs folder with basic README if it doesn't exist
+    if [[ ! -d "$docs_path" ]]; then
+        log "Creating $docs_path directory with default README..."
+        mkdir -p "$docs_path"
+        cat > "$docs_path/README.md" << 'DOCEOF'
+# Documentation
+
+Welcome to your documentation!
+
+Edit this file or add more markdown files to build your docs.
+
+## Features
+
+- Live reload on file changes
+- GitHub-flavored markdown
+- Sidebar navigation (add `_sidebar.md`)
+
+## Getting Started
+
+1. Edit `README.md`
+2. Add more `.md` files
+3. Create `_sidebar.md` for navigation
+DOCEOF
+    fi
+
+    # Build docify image if needed
+    if ! podman image exists "$docify_image" 2>/dev/null; then
+        log "Building docify image..."
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        podman build -t "$docify_image" -f "$script_dir/Dockerfile.docify" "$script_dir"
+    fi
+
+    log "Starting documentation server..."
+    log "URL: http://localhost:$docs_port"
+    log "Serving: $(pwd)/$docs_path"
+    log "Press Ctrl+C to stop"
+    echo ""
+
+    podman run -it --rm \
+        --name "docify-$(basename "$(pwd)")" \
+        -p "${docs_port}:3000" \
+        -v "$(pwd)/${docs_path}:/workspace/docs:Z" \
+        "$docify_image"
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -776,6 +836,11 @@ main() {
 
     # Handle modes
     case "$MODE" in
+        docs)
+            shift || true
+            run_docs_mode "$@"
+            exit 0
+            ;;
         clean)
             run_clean_mode
             ;;
@@ -803,7 +868,7 @@ main() {
             esac
             ;;
         *)
-            error "Unknown mode: $MODE (use: mount, clone, recover, clean, build)"
+            error "Unknown mode: $MODE (use: mount, clone, recover, clean, build, docs)"
             ;;
     esac
 }

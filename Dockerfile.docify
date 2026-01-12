@@ -1,0 +1,27 @@
+# Lightweight documentation server
+# Serves /docs folder with live markdown preview using docsify
+#
+# Usage:
+#   ./sandbox.sh docs              # Serve ./docs on http://localhost:3000
+#   ./sandbox.sh docs my-folder    # Serve ./my-folder
+#   DOCS_PORT=4000 ./sandbox.sh docs
+
+FROM node:22-alpine
+
+# Install docsify-cli for live markdown preview
+RUN npm install -g docsify-cli
+
+# Create non-root user
+RUN adduser -D -s /bin/sh docify && \
+    mkdir -p /workspace/docs && \
+    chown -R docify:docify /workspace
+
+WORKDIR /workspace
+
+USER docify
+
+# Default port
+EXPOSE 3000
+
+# Serve docs folder (docsify auto-creates index.html if missing)
+CMD ["docsify", "serve", "docs", "--port", "3000"]

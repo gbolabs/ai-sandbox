@@ -54,6 +54,21 @@ jobs:
             ai-sandbox-${{ matrix.cli }}:test \
             "Container ${{ matrix.cli }} OK"
 
+  build-docify:
+    name: Build Docify Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build docify image
+        run: docker build -t ai-sandbox-docify:test -f Dockerfile.docify .
+
+      - name: Test docify starts
+        run: |
+          docker run --rm --entrypoint echo \
+            ai-sandbox-docify:test \
+            "Container docify OK"
+
   test-entrypoint:
     name: Test Entrypoint Services
     runs-on: ubuntu-latest

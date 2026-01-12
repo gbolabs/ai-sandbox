@@ -54,6 +54,20 @@ Features:
 ./sandbox.sh clean --all --clean-shared  # Include shared Jaeger
 ```
 
+### Documentation Server
+```bash
+./sandbox.sh docs                     # Serve ./docs on http://localhost:3000
+./sandbox.sh docs my-folder           # Serve custom folder
+DOCS_PORT=4000 ./sandbox.sh docs      # Custom port
+```
+
+### Markdown to PDF (in Claude container)
+```bash
+# Inside container:
+md2pdf README.md                      # Creates README.pdf
+pandoc doc.md -o doc.pdf --pdf-engine=weasyprint  # Direct usage
+```
+
 ## Architecture
 
 ### Multi-Project Support
@@ -127,15 +141,18 @@ All containers are **full development environments**, not just CLI wrappers:
 - **Angular CLI** - Frontend development
 - **code-server** - VS Code in browser
 - **Git, vim, jq** - Essential tools
+- **Pandoc + WeasyPrint** - MD to PDF with Unicode/emoji support (Claude container)
+- **Noto fonts** - Full emoji and CJK character rendering
 
 ## File Structure
 
 ```
 .
 ├── sandbox.sh                  # Unified launcher script
-├── Dockerfile.claude-sandbox   # Claude Code container
+├── Dockerfile.claude-sandbox   # Claude Code container (with md2pdf)
 ├── Dockerfile.vibe-sandbox     # Vibe CLI container
 ├── Dockerfile.copilot-sandbox  # GitHub Copilot CLI container
+├── Dockerfile.docify           # Lightweight docs server (docsify)
 ├── entrypoint.sh               # Unified entrypoint (all CLIs)
 ├── api-logger/                 # API traffic logging proxy
 │   ├── Dockerfile
@@ -163,7 +180,7 @@ All containers are **full development environments**, not just CLI wrappers:
 GitHub Actions CI runs on every push/PR:
 - **ShellCheck** - Lint all shell scripts
 - **Unit tests** - Test `sandbox.sh` utility functions
-- **Docker builds** - Build all 3 images (matrix)
+- **Docker builds** - Build all CLI images + docify (matrix)
 - **Entrypoint tests** - Verify services start in container
 
 Run tests locally:
