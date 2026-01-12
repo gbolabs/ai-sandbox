@@ -1,33 +1,73 @@
 #!/bin/bash
-echo "🤖 Claude Code Sandbox"
-echo "======================"
+echo "AI Code Sandbox"
+echo "==============="
+echo "Project: ${PROJECT_NAME:-unknown}"
 echo "Mode: YOLO (all permissions granted)"
 echo ""
+
+# =============================================================================
+# Authentication Status
+# =============================================================================
 if [[ -n "${GH_TOKEN:-}" ]]; then
-    echo "✅ GitHub CLI authenticated"
+    echo "GitHub CLI: authenticated"
 else
-    echo "⚠️  GitHub CLI not authenticated (GH_TOKEN not set)"
+    echo "GitHub CLI: not authenticated (GH_TOKEN not set)"
 fi
+
+if [[ -n "${AZURE_DEVOPS_PAT:-}" ]]; then
+    echo "Azure DevOps: PAT configured"
+elif [[ -d "$HOME/.azure" ]]; then
+    echo "Azure DevOps: az CLI context mounted"
+fi
+
 if [[ "${CLAUDE_CODE_ENABLE_TELEMETRY:-}" == "1" ]]; then
-    echo "✅ Telemetry: Enabled (OTel to ${OTEL_EXPORTER_OTLP_ENDPOINT:-not set})"
+    echo "Telemetry: Enabled (OTel to ${OTEL_EXPORTER_OTLP_ENDPOINT:-Jaeger})"
 else
-    echo "ℹ️  Telemetry: Disabled (use --otel flag to enable)"
+    echo "Telemetry: Disabled (use --otel flag to enable)"
 fi
 echo ""
-# Start code-server in the background
-echo "🚀 Starting code-server on 0.0.0.0:8443..."
-code-server --bind-addr 0.0.0.0:8443 --auth none &
-echo "✅ code-server running at http://0.0.0.0:8443"
 
-# Start upload server in the background
-echo "🚀 Starting upload server on 0.0.0.0:8888..."
+# =============================================================================
+# Merge host .claude settings if mounted
+# =============================================================================
+if [[ -d "/home/claude/.claude-host" ]]; then
+    echo "Merging host Claude settings..."
+    mkdir -p /home/claude/.claude
+    for file in /home/claude/.claude-host/*; do
+        if [[ -f "$file" ]]; then
+            local_file="/home/claude/.claude/$(basename "$file")"
+            if [[ ! -f "$local_file" ]]; then
+                cp "$file" "$local_file"
+                echo "  Copied: $(basename "$file")"
+            fi
+        fi
+    done
+fi
+
+# =============================================================================
+# Start services
+# =============================================================================
+echo "Starting code-server on 0.0.0.0:8443..."
+code-server --bind-addr 0.0.0.0:8443 --auth none &
+
+echo "Starting upload server on 0.0.0.0:8888..."
 python3 /opt/upload-server.py > /tmp/upload-server.log 2>&1 &
-echo "✅ Upload server running at http://0.0.0.0:8888"
-echo "   Drop/paste files there → available at ~/share in container"
+echo "Upload files at http://localhost:UPLOAD_PORT -> available at ~/share"
 echo ""
 
-# Clone repo if in clone mode (or update if already cloned)
+# =============================================================================
+# Clone repository if in clone mode
+# =============================================================================
 if [[ -n "${REPO_URL:-}" ]]; then
+    # Handle Azure DevOps PAT authentication
+    CLONE_URL="$REPO_URL"
+    if [[ -n "${AZURE_DEVOPS_PAT:-}" ]]; then
+        if [[ "$REPO_URL" =~ dev\.azure\.com ]] || [[ "$REPO_URL" =~ visualstudio\.com ]]; then
+            echo "Using Azure DevOps PAT for authentication"
+            CLONE_URL=$(echo "$REPO_URL" | sed "s|https://|https://${AZURE_DEVOPS_PAT}@|")
+        fi
+    fi
+
     if [[ -d ".git" ]]; then
         echo "Repository already cloned, resuming..."
         echo "Current branch: $(git branch --show-current)"
@@ -35,17 +75,17 @@ if [[ -n "${REPO_URL:-}" ]]; then
     elif [[ -z "$(ls -A .)" ]]; then
         # Directory is empty, clone fresh
         echo "Cloning repository: $REPO_URL"
-        git clone "$REPO_URL" . || { echo "Failed to clone repository"; exit 1; }
+        git clone "$CLONE_URL" . || { echo "Failed to clone repository"; exit 1; }
         if [[ -n "${BRANCH:-}" ]]; then
             echo "Checking out branch: $BRANCH"
             git checkout "$BRANCH" || { echo "Failed to checkout branch"; exit 1; }
         fi
     else
         # Directory has files but no .git - clear and clone
-        echo "⚠️  Workspace has files but no git repository. Cleaning and cloning fresh..."
+        echo "Workspace has files but no git repository. Cleaning and cloning fresh..."
         rm -rf ./* ./.[!.]* 2>/dev/null || true
         echo "Cloning repository: $REPO_URL"
-        git clone "$REPO_URL" . || { echo "Failed to clone repository"; exit 1; }
+        git clone "$CLONE_URL" . || { echo "Failed to clone repository"; exit 1; }
         if [[ -n "${BRANCH:-}" ]]; then
             echo "Checking out branch: $BRANCH"
             git checkout "$BRANCH" || { echo "Failed to checkout branch"; exit 1; }
@@ -54,6 +94,9 @@ if [[ -n "${REPO_URL:-}" ]]; then
     echo ""
 fi
 
+# =============================================================================
+# Start Claude Code
+# =============================================================================
 echo "Starting Claude Code..."
 echo ""
 exec claude --dangerously-skip-permissions "$@"

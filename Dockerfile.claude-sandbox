@@ -4,17 +4,13 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0
 RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     apt-get install -y nodejs
 
-# Install tools (including Python for upload server and EXIF processing tools)
+# Install tools (including Python for upload server)
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     jq \
     vim \
     python3 \
-    exiftool \
-    libimage-exiftool-perl \
-    exiv2 \
-    jhead \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -52,17 +48,23 @@ RUN (groupadd docker || true) && \
 WORKDIR /workspace
 
 # Copy and set up entrypoint script
-COPY scripts/entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copy upload server script
-COPY scripts/claude-upload-server/server.py /opt/upload-server.py
+COPY claude-upload-server/server.py /opt/upload-server.py
 RUN chmod +x /opt/upload-server.py
 
 # Switch to non-root user
 USER claude
 
-# Create config directories for plugins, auth, and file sharing (will be mounted as volume)
-RUN mkdir -p /home/claude/.claude /home/claude/.anthropic /home/claude/share
+# Create config directories for host context mounts and file sharing
+# These directories serve as mount targets for host authentication contexts
+RUN mkdir -p /home/claude/.claude \
+             /home/claude/.anthropic \
+             /home/claude/.config/gh \
+             /home/claude/.azure \
+             /home/claude/share \
+             /home/claude/api-logs
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -1,46 +1,30 @@
 # Claude API Traffic Logger
-# Bundles claude-code-logger (HTTP proxy) + Fluent Bit (OTLP shipper)
+# Simple HTTP proxy that logs API requests/responses to JSON files
 #
 # Architecture:
-#   Claude Code --HTTP--> claude-code-logger:8000 --HTTPS--> api.anthropic.com
+#   Claude Code --HTTP--> api-logger:8000 --HTTPS--> api.anthropic.com
 #                              |
-#                              v (logs)
-#                         Fluent Bit --OTLP--> Seq
+#                              v (JSON logs)
+#                         /data/api-logs/{project}/
 
-FROM node:22-slim
+FROM python:3.12-slim
 
 # Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir httpx
 
-# Install Fluent Bit
-RUN curl -fsSL https://packages.fluentbit.io/fluentbit.key | gpg --dearmor -o /usr/share/keyrings/fluentbit.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/fluentbit.gpg] https://packages.fluentbit.io/debian/bookworm bookworm main" \
-       > /etc/apt/sources.list.d/fluentbit.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends fluent-bit \
-    && rm -rf /var/lib/apt/lists/*
+# Create directories
+RUN mkdir -p /data/api-logs /app
 
-# Install claude-code-logger globally
-RUN npm install -g claude-code-logger
+# Copy the proxy server
+COPY server.py /app/server.py
 
-# Create log directory
-RUN mkdir -p /var/log
-
-# Copy configuration files
-COPY fluent-bit.conf /etc/fluent-bit/fluent-bit.conf
-COPY parsers.conf /etc/fluent-bit/parsers.conf
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+WORKDIR /app
 
 # Expose the proxy port
 EXPOSE 8000
 
-# Health check - verify the proxy is responding
+# Health check
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -sf http://localhost:8000/ || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "server.py"]
