@@ -22,6 +22,13 @@
 
 set -euo pipefail
 
+# Allow sourcing for testing (--source-only)
+if [[ "${1:-}" == "--source-only" ]]; then
+    # Export functions for testing, skip execution
+    set +euo pipefail
+    return 0 2>/dev/null || exit 0
+fi
+
 # =============================================================================
 # Help and Usage
 # =============================================================================

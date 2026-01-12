@@ -1,26 +1,25 @@
-# GitHub Copilot CLI Sandbox
-# Containerized environment for GitHub Copilot CLI (gh copilot)
+# GitHub Copilot CLI Sandbox - Development Environment
+# Base: .NET 10 SDK + Node.js 24 + Angular CLI (standard dev environment)
 #
 # Usage:
 #   gh copilot suggest "how to find large files"
 #   gh copilot explain "git rebase -i HEAD~3"
 
-FROM debian:bookworm-slim
+FROM mcr.microsoft.com/dotnet/sdk:10.0
 
-# Install base tools
+# Install Node.js 24 + Angular CLI
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g @angular/cli@latest
+
+# Install tools
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     jq \
     vim \
     python3 \
-    sudo \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js 22 LTS
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -40,23 +39,21 @@ RUN useradd -m -s /bin/bash copilot && \
 
 WORKDIR /workspace
 
-# Copy entrypoint script
-COPY entrypoint.copilot.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Copy upload server
+# Copy entrypoint and upload server
+COPY entrypoint.sh /entrypoint.sh
 COPY upload-server/server.py /opt/upload-server.py
-RUN chmod +x /opt/upload-server.py
+RUN chmod +x /entrypoint.sh /opt/upload-server.py
 
 # Switch to non-root user
 USER copilot
 
+# Install gh-copilot extension
+RUN gh extension install github/gh-copilot || true
+
 # Create config directories for host context mounts
 RUN mkdir -p /home/copilot/.config/gh \
              /home/copilot/.azure \
-             /home/copilot/share
-
-# Install gh-copilot extension (as user)
-RUN gh extension install github/gh-copilot || true
+             /home/copilot/share \
+             /home/copilot/api-logs
 
 ENTRYPOINT ["/entrypoint.sh"]

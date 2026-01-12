@@ -1,6 +1,14 @@
+# Vibe CLI Sandbox - Development Environment for Mistral AI
+# Base: .NET 10 SDK + Node.js 24 + Angular CLI (standard dev environment)
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
-# Install tools including Python for uv
+# Install Node.js 24 + Angular CLI
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g @angular/cli@latest
+
+# Install tools (including Python for uv/vibe)
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -8,8 +16,7 @@ RUN apt-get update && apt-get install -y \
     vim \
     python3 \
     python3-pip \
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -17,32 +24,38 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
     apt-get update && \
     apt-get install -y gh && \
-    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-
 
 # Install code-server (VS Code in browser)
-RUN curl -fsSL https://code-server.dev/install.sh | sh && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 # Create non-root user
 RUN useradd -m -s /bin/bash vibe && \
     mkdir -p /workspace && \
     chown vibe:vibe /workspace
 
-# Create workspace
 WORKDIR /workspace
 
-# Copy init script and entrypoint
-COPY scripts/init-vibe.sh /init-vibe.sh
-COPY scripts/entrypoint.vibe.sh /entrypoint.sh
-RUN chmod +x /init-vibe.sh && \
-    chmod +x /entrypoint.sh
+# Copy entrypoint and upload server
+COPY entrypoint.sh /entrypoint.sh
+COPY upload-server/server.py /opt/upload-server.py
+RUN chmod +x /entrypoint.sh /opt/upload-server.py
 
 # Switch to non-root user
 USER vibe
 
-# Run initialization script first, then entrypoint
+# Install uv + Vibe CLI in the image (not at runtime)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    ~/.local/bin/uv tool install mistral-vibe
+
+# Add uv and vibe to PATH
+ENV PATH="/home/vibe/.local/bin:/home/vibe/.local/share/uv/tools/bin:$PATH"
+
+# Create config directories for host context mounts
+RUN mkdir -p /home/vibe/.vibe \
+             /home/vibe/.config/gh \
+             /home/vibe/.azure \
+             /home/vibe/share \
+             /home/vibe/api-logs
+
 ENTRYPOINT ["/entrypoint.sh"]

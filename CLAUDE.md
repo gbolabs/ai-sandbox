@@ -119,6 +119,15 @@ The auth directories are mounted read-only into the container.
 | `GH_TOKEN` | GitHub token for private repos and Copilot |
 | `AZURE_DEVOPS_PAT` | Azure DevOps personal access token |
 
+## Development Environment
+
+All containers are **full development environments**, not just CLI wrappers:
+- **.NET 10 SDK** - Standard runtime
+- **Node.js 24** - JavaScript/TypeScript support
+- **Angular CLI** - Frontend development
+- **code-server** - VS Code in browser
+- **Git, vim, jq** - Essential tools
+
 ## File Structure
 
 ```
@@ -127,15 +136,17 @@ The auth directories are mounted read-only into the container.
 ├── Dockerfile.claude-sandbox   # Claude Code container
 ├── Dockerfile.vibe-sandbox     # Vibe CLI container
 ├── Dockerfile.copilot-sandbox  # GitHub Copilot CLI container
-├── entrypoint.sh               # Claude entrypoint
-├── entrypoint.copilot.sh       # Copilot entrypoint
+├── entrypoint.sh               # Unified entrypoint (all CLIs)
 ├── api-logger/                 # API traffic logging proxy
 │   ├── Dockerfile
 │   └── server.py
-├── upload-server/       # File upload server
+├── upload-server/              # File upload server
 │   └── server.py
-└── docs/
-    └── REFACTORING-PLAN.md
+├── test/
+│   └── test-functions.sh       # Unit tests for sandbox.sh
+└── .github/
+    └── workflows/
+        └── ci.yml              # CI pipeline (ShellCheck, tests, builds)
 ```
 
 ## Key Implementation Details
@@ -145,3 +156,17 @@ The auth directories are mounted read-only into the container.
 - Azure DevOps PAT injected into clone URL when detected
 - Host settings merged on startup
 - Concurrent containers via unique naming and port allocation
+- Unified entrypoint detects CLI type via `$CLI_TYPE` or username
+
+## CI/CD
+
+GitHub Actions CI runs on every push/PR:
+- **ShellCheck** - Lint all shell scripts
+- **Unit tests** - Test `sandbox.sh` utility functions
+- **Docker builds** - Build all 3 images (matrix)
+- **Entrypoint tests** - Verify services start in container
+
+Run tests locally:
+```bash
+./test/test-functions.sh
+```
