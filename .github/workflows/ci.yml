@@ -86,7 +86,7 @@ jobs:
           docker run -d --name test-container \
             --entrypoint bash \
             ai-sandbox-claude:test \
-            -c "code-server --bind-addr 0.0.0.0:8443 --auth none & python3 /opt/upload-server.py & sleep 30"
+            -c "mkdir -p /workspace/docs && code-server --bind-addr 0.0.0.0:8443 --auth none & python3 /opt/upload-server.py & docsify serve /workspace/docs --port 3000 & sleep 30"
 
           # Wait for services to start
           sleep 5
@@ -104,6 +104,14 @@ jobs:
             echo "✓ upload-server running"
           else
             echo "✗ upload-server not running"
+            exit 1
+          fi
+
+          # Check docsify is running
+          if docker exec test-container pgrep -f docsify > /dev/null; then
+            echo "✓ docsify running"
+          else
+            echo "✗ docsify not running"
             exit 1
           fi
 

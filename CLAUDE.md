@@ -54,7 +54,13 @@ Features:
 ./sandbox.sh clean --all --clean-shared  # Include shared Jaeger
 ```
 
-### Documentation Server
+### Documentation Server (inside containers)
+The docs server runs automatically inside all containers, serving `/workspace/docs`:
+- Auto-creates `/workspace/docs/README.md` if folder doesn't exist
+- Access at dynamic port shown at startup (e.g., `http://localhost:19000`)
+- Live reload on file changes
+
+Standalone mode (without full container):
 ```bash
 ./sandbox.sh docs                     # Serve ./docs on http://localhost:3000
 ./sandbox.sh docs my-folder           # Serve custom folder
@@ -84,6 +90,7 @@ pandoc doc.md -o doc.pdf --pdf-engine=weasyprint  # Direct usage
 | code-server | 18443 | base + (hash % 100) * 10 |
 | upload-server | 18888 | base + 445 + offset |
 | api-logger | 18800 | base + 357 + offset |
+| docs-server | 19000 | base + 557 + offset |
 | Jaeger UI (shared) | 16686 | Fixed |
 | Jaeger OTLP (shared) | 4318 | Fixed |
 
@@ -140,6 +147,7 @@ All containers are **full development environments**, not just CLI wrappers:
 - **Node.js 24** - JavaScript/TypeScript support
 - **Angular CLI** - Frontend development
 - **code-server** - VS Code in browser
+- **docsify** - Live documentation preview
 - **Git, vim, jq** - Essential tools
 - **Pandoc + WeasyPrint** - MD to PDF with Unicode/emoji support (Claude container)
 - **Noto fonts** - Full emoji and CJK character rendering

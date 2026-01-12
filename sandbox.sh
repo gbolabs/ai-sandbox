@@ -329,6 +329,7 @@ get_project_ports() {
     CODE_SERVER_PORT=$((base + port_offset))
     UPLOAD_PORT=$((base + 445 + port_offset))
     API_LOGGER_PORT=$((base + 357 + port_offset))
+    DOCS_PORT=$((base + 557 + port_offset))
 }
 
 get_host_context_mounts() {
@@ -603,7 +604,7 @@ run_mount_mode() {
         podman volume create "$HOME_VOLUME"
     fi
 
-    log "Ports: code-server=$CODE_SERVER_PORT, upload=$UPLOAD_PORT"
+    log "Ports: code-server=$CODE_SERVER_PORT, upload=$UPLOAD_PORT, docs=$DOCS_PORT"
 
     local podman_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock"
 
@@ -619,6 +620,7 @@ run_mount_mode() {
         -e PROJECT_NAME="$PROJECT_NAME" \
         -p ${CODE_SERVER_PORT}:8443 \
         -p ${UPLOAD_PORT}:8888 \
+        -p ${DOCS_PORT}:3000 \
         -v "$(pwd):/workspace:Z" \
         -v "$HOME_VOLUME:/home/${USER_NAME}:Z" \
         -v "$podman_socket:/var/run/docker.sock:Z" \
@@ -662,7 +664,7 @@ run_clone_mode() {
 
     podman rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
-    log "Ports: code-server=$CODE_SERVER_PORT, upload=$UPLOAD_PORT"
+    log "Ports: code-server=$CODE_SERVER_PORT, upload=$UPLOAD_PORT, docs=$DOCS_PORT"
 
     local podman_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock"
 
@@ -680,6 +682,7 @@ run_clone_mode() {
         -e PROJECT_NAME="$PROJECT_NAME" \
         -p ${CODE_SERVER_PORT}:8443 \
         -p ${UPLOAD_PORT}:8888 \
+        -p ${DOCS_PORT}:3000 \
         -v "$WORKSPACE_VOLUME:/workspace:Z" \
         -v "$HOME_VOLUME:/home/${USER_NAME}:Z" \
         -v "$podman_socket:/var/run/docker.sock:Z" \

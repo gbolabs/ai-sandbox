@@ -75,6 +75,26 @@ code-server --bind-addr 0.0.0.0:8443 --auth none &
 echo "Starting upload server on 0.0.0.0:8888..."
 python3 /opt/upload-server.py > /tmp/upload-server.log 2>&1 &
 
+echo "Starting docs server on 0.0.0.0:3000..."
+# Create docs folder with default README if it doesn't exist
+if [[ ! -d "/workspace/docs" ]]; then
+    mkdir -p /workspace/docs
+    cat > /workspace/docs/README.md << 'DOCEOF'
+# Documentation
+
+Welcome to your project documentation!
+
+Edit this file or add more markdown files to build your docs.
+
+## Getting Started
+
+1. Edit `docs/README.md`
+2. Add more `.md` files
+3. Create `_sidebar.md` for navigation
+DOCEOF
+fi
+docsify serve /workspace/docs --port 3000 > /tmp/docsify.log 2>&1 &
+
 echo ""
 
 # =============================================================================
