@@ -38,7 +38,7 @@ Usage:
 Supported AI CLIs:
   claude       Claude Code by Anthropic (default)
   vibe         Vibe CLI by Mistral AI
-  copilot      GitHub Copilot CLI (planned)
+  copilot      GitHub Copilot CLI (gh copilot)
 
 Modes:
   mount        Mount current directory (default)
@@ -79,6 +79,9 @@ Examples:
 
   # Use Vibe CLI instead
   ./sandbox.sh --cli=vibe mount
+
+  # Use GitHub Copilot CLI
+  ./sandbox.sh --cli=copilot mount
 
   # Clone a GitHub repository with Claude
   ./sandbox.sh --repo=https://github.com/user/repo.git clone
@@ -168,7 +171,13 @@ set_cli_config() {
             API_KEY_VAR="MISTRAL_API_KEY"
             ;;
         copilot)
-            error "GitHub Copilot CLI support is not yet implemented"
+            IMAGE_NAME="ai-sandbox-copilot:latest"
+            DOCKERFILE="Dockerfile.copilot-sandbox"
+            CONTAINER_PREFIX="copilot-sandbox"
+            VOLUME_PREFIX="copilot"
+            USER_NAME="copilot"
+            ENTRYPOINT_CLI="bash"
+            API_KEY_VAR="GH_TOKEN"
             ;;
         *)
             error "Unknown CLI type: $CLI_TYPE (use: claude, vibe, copilot)"
@@ -328,6 +337,9 @@ get_host_context_mounts() {
             if [[ -d "$HOME/.vibe" ]]; then
                 mounts+="-v $HOME/.vibe:/home/vibe/.vibe:Z "
             fi
+            ;;
+        copilot)
+            # Copilot uses gh CLI config - mounted below as common
             ;;
     esac
 
@@ -519,6 +531,9 @@ check_prereqs() {
             if [[ -z "${MISTRAL_API_KEY:-}" ]]; then
                 warn "MISTRAL_API_KEY not set"
             fi
+            ;;
+        copilot)
+            # Copilot needs gh auth, checked via get_gh_token
             ;;
     esac
 

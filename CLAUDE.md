@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Supported AI CLIs:
 - **Claude Code** (Anthropic) - Default
 - **Vibe CLI** (Mistral AI)
-- **GitHub Copilot CLI** (planned)
+- **GitHub Copilot CLI** (gh copilot)
 
 Features:
 - Multi-project support with concurrent containers
@@ -25,6 +25,9 @@ Features:
 
 # Use Vibe CLI instead
 ./sandbox.sh --cli=vibe mount
+
+# Use GitHub Copilot CLI
+./sandbox.sh --cli=copilot mount
 
 # Clone a GitHub repository
 ./sandbox.sh --repo=https://github.com/user/repo.git clone
@@ -111,14 +114,16 @@ When `--log-api` is enabled:
 
 ```
 .
-├── sandbox.sh              # Unified launcher script
-├── Dockerfile.claude-sandbox  # Claude Code container
-├── Dockerfile.vibe-sandbox    # Vibe CLI container
-├── entrypoint.sh           # Container entrypoint
-├── api-logger/             # API traffic logging proxy
+├── sandbox.sh                  # Unified launcher script
+├── Dockerfile.claude-sandbox   # Claude Code container
+├── Dockerfile.vibe-sandbox     # Vibe CLI container
+├── Dockerfile.copilot-sandbox  # GitHub Copilot CLI container
+├── entrypoint.sh               # Claude entrypoint
+├── entrypoint.copilot.sh       # Copilot entrypoint
+├── api-logger/                 # API traffic logging proxy
 │   ├── Dockerfile
 │   └── server.py
-├── claude-upload-server/   # File upload server
+├── claude-upload-server/       # File upload server
 │   └── server.py
 └── docs/
     └── REFACTORING-PLAN.md
