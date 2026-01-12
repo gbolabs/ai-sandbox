@@ -4,69 +4,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository provides containerized sandbox environments for running Claude Code and Mistral Vibe CLI in isolated Podman containers. The sandboxes support **multi-project portability** - work with any GitHub or Azure DevOps repository, run concurrent containers for different projects, and reuse host authentication contexts.
+**AI Sandbox** - Containerized development environments for AI coding assistants.
+
+Supported AI CLIs:
+- **Claude Code** (Anthropic) - Default
+- **Vibe CLI** (Mistral AI)
+- **GitHub Copilot CLI** (planned)
+
+Features:
+- Multi-project support with concurrent containers
+- Any git repository (GitHub, Azure DevOps)
+- Host context mounting (reuse existing auth)
+- OpenTelemetry tracing with Jaeger
 
 ## Quick Start
 
-### Claude Sandbox
 ```bash
-# Mount current directory (project name derived from dirname)
-./claude-sandbox.sh mount
+# Mount current directory with Claude Code (default)
+./sandbox.sh mount
+
+# Use Vibe CLI instead
+./sandbox.sh --cli=vibe mount
 
 # Clone a GitHub repository
-./claude-sandbox.sh --repo=https://github.com/user/repo.git clone
+./sandbox.sh --repo=https://github.com/user/repo.git clone
 
 # Clone an Azure DevOps repository
-./claude-sandbox.sh --repo=https://dev.azure.com/org/project/_git/repo clone
+./sandbox.sh --repo=https://dev.azure.com/org/project/_git/repo clone
 
-# With OpenTelemetry tracing (traces to Jaeger)
-./claude-sandbox.sh --otel mount
+# With OpenTelemetry tracing
+./sandbox.sh --otel mount
 
-# With API traffic logging (for development reports)
-./claude-sandbox.sh --otel --log-api mount
+# With API traffic logging
+./sandbox.sh --otel --log-api mount
 
 # Custom project name and port base
-./claude-sandbox.sh --project=myproj --port-base=20000 mount
-```
-
-### Vibe Sandbox
-```bash
-# Mount current directory
-./vibe-sandbox.sh mount
-
-# Clone a repository
-./vibe-sandbox.sh --repo=https://github.com/user/repo.git clone
+./sandbox.sh --project=myproj --port-base=20000 mount
 ```
 
 ### Management Commands
 ```bash
-./claude-sandbox.sh recover                  # Reattach to stopped container
-./claude-sandbox.sh build                    # Rebuild Docker image
-./claude-sandbox.sh clean                    # Clean current project resources
-./claude-sandbox.sh clean --clean-shared     # Also clean Jaeger and shared resources
+./sandbox.sh recover                  # Reattach to stopped container
+./sandbox.sh build                    # Rebuild Docker image
+./sandbox.sh clean --containers       # Clean project containers
+./sandbox.sh clean --all              # Full project cleanup
+./sandbox.sh clean --all --clean-shared  # Include shared Jaeger
 ```
 
 ## Architecture
 
 ### Multi-Project Support
 
-- **Project naming**: Automatically derived from repo URL or directory name (sanitized, max 20 chars)
-- **Container naming**: Suffixed with project name (e.g., `claude-sandbox-myproject`)
-- **Volume naming**: Per-project volumes (e.g., `claude-workspace-myproject`)
-- **Port allocation**: Hash-based offset from project name in 18xxx range to avoid conflicts
+- **Project naming**: Auto-derived from repo URL or directory name (sanitized, max 20 chars)
+- **Container naming**: `{cli}-sandbox-{project}` (e.g., `claude-sandbox-myproject`)
+- **Volume naming**: `{cli}-{workspace|home}-{project}`
+- **Port allocation**: Hash-based offset in 18xxx range to avoid conflicts
 
-### Two Sandbox Variants
-
-1. **Claude Sandbox** (`claude-sandbox.sh`, `Dockerfile.claude-sandbox`)
-   - Runs Claude Code CLI with `--dangerously-skip-permissions` (YOLO mode)
-   - Based on .NET SDK 10, includes Node.js 24, Angular CLI, Playwright browsers
-   - Runs as non-root `claude` user
-
-2. **Vibe Sandbox** (`vibe-sandbox.sh`, `Dockerfile.vibe-sandbox`)
-   - Runs Mistral Vibe CLI with optional `VIBE_ACCEPT_ALL=1`
-   - Lighter image, runs as non-root `vibe` user
-
-### Port Allocation (18xxx range)
+### Port Allocation
 
 | Service | Default Base | Formula |
 |---------|--------------|---------|
@@ -78,9 +72,10 @@ This repository provides containerized sandbox environments for running Claude C
 
 ### Host Context Mounts
 
-The sandboxes can reuse authentication from your host machine:
-- `~/.anthropic` → Read-write (updatable auth)
-- `~/.claude` → Read-only (settings visible, writes to container volume)
+Authentication is reused from your host machine:
+- `~/.anthropic` → Read-write (Claude API credentials)
+- `~/.claude` → Read-only (Claude settings)
+- `~/.vibe` → Read-write (Vibe settings, when using --cli=vibe)
 - `~/.config/gh` → Read-only (GitHub CLI auth)
 - `~/.azure` → Read-only (Azure CLI auth)
 
@@ -94,30 +89,45 @@ When `--otel` is enabled:
 ### API Traffic Logging
 
 When `--log-api` is enabled:
-- Simple HTTP proxy logs requests/responses to JSON files
+- HTTP proxy logs requests/responses to JSON files
 - Logs saved to `~/api-logs/{project}/` in container
-- Format: JSONL files per day (for generating development reports)
-- Implementation: `claude-api-logger/server.py`
+- Format: JSONL files per day (for development reports)
 
 ### File Upload Server
 - Web UI at dynamic port (shown at startup)
 - Drag & drop files or paste images from clipboard
 - Files saved to `~/share` in container
-- Implementation: `claude-upload-server/server.py`
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Anthropic API key (required for Claude) |
-| `MISTRAL_API_KEY` | Mistral API key (required for Vibe) |
+| `ANTHROPIC_API_KEY` | For Claude Code |
+| `MISTRAL_API_KEY` | For Vibe CLI |
 | `GH_TOKEN` | GitHub token for private repos |
 | `AZURE_DEVOPS_PAT` | Azure DevOps personal access token |
 
+## File Structure
+
+```
+.
+├── sandbox.sh              # Unified launcher script
+├── Dockerfile.claude-sandbox  # Claude Code container
+├── Dockerfile.vibe-sandbox    # Vibe CLI container
+├── entrypoint.sh           # Container entrypoint
+├── api-logger/             # API traffic logging proxy
+│   ├── Dockerfile
+│   └── server.py
+├── claude-upload-server/   # File upload server
+│   └── server.py
+└── docs/
+    └── REFACTORING-PLAN.md
+```
+
 ## Key Implementation Details
 
-- Project name automatically derived from repo URL or current directory
-- Container recovery via `recover` mode (keeps containers after exit)
+- Project name automatically derived from repo URL or directory
+- Container recovery via `recover` mode
 - Azure DevOps PAT injected into clone URL when detected
-- Host `.claude` settings merged on startup (copy if not present locally)
-- Concurrent containers supported via unique naming and port allocation
+- Host settings merged on startup
+- Concurrent containers via unique naming and port allocation
